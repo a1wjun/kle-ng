@@ -124,7 +124,7 @@ Extra tools are grouped under a single button in the left toolbar. There are six
 2. **Add Switch Matrix Coordinates** — assign VIA-style row/column labels
 3. **Move Rotation Origins** — recalculate key positions with a new rotation reference point
 4. **Theme Tools** — apply color themes to the layout
-5. **Sanitize Layout** — find and clean up redundant JSON properties and layout offsets
+5. **Sanitize Layout** — find and clean up redundant JSON properties and layout offsets, and warn about overlapping keys
 6. **Character Picker** — search and insert special characters into labels
 
 ### Legend Tools
@@ -210,14 +210,23 @@ See [Color Themes](./color-themes) for the full theme format, matcher syntax ref
 
 The **Sanitize Layout** tool scans the layout for redundant data and non-normalized values, and lets you clean them up in bulk. Open it from **Extra Tools → Sanitize Layout**.
 
-Scanning happens automatically when the panel opens, and issues are grouped into two categories:
+Scanning happens automatically when the panel opens, and issues are grouped into three categories:
 
 | Category           | Description                                                                                                                                                                                    |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Redundant data** | Properties left over on keys that no longer need them — for example, a font size or text color set on a label that is now blank, or a rotation origin still stored on a key that isn't rotated |
 | **Normalization**  | Values that are valid but not in their canonical form — for example, a layout that doesn't start at (0,0), or rotation angles outside the -180..180 range                                      |
+| **Warnings**       | Problems the tool can find but must not fix on your behalf, because the fix is a design decision. These have no checkbox and are never touched by **Apply Fixes**                              |
 
 Each rule shows a count of how many keys or properties it would affect. Rules with a count of zero are disabled — there's nothing to fix. Uncheck any rule you want to skip, then click **Apply Fixes** to clean up only the checked rules. Use **Rescan** to re-scan the layout after making changes without closing the panel.
+
+#### Overlapping keys
+
+The one warning today is **Overlapping keys**: pairs of keys whose bodies occupy the same space, which makes the layout impossible to build. Rotation and non-rectangular keys (ISO and big-ass enter) are both accounted for, and keys laid flush against each other are not overlapping.
+
+Ghost and decal keys are ignored — neither is a switch. On a multi-layout board, each layout is checked separately, so alternatives that replace one another — an ANSI enter and the ISO enter that takes its place — are never reported against each other. Both [VIA layout options](./via-and-metadata) and [QMK layout membership](./import-export) are understood.
+
+The count is of _pairs_: one key overlapping two neighbours counts as two. Click **Select** on the row to select the affected keys on the canvas and see where the problem is.
 
 ::: tip
 Applying fixes creates a single undo step, so <kbd>Ctrl</kbd>+<kbd>Z</kbd> reverts everything the tool changed at once.

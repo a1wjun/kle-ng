@@ -1,6 +1,6 @@
 import type { Key } from '@adamws/kle-serial'
 import { normalizeAngleDegrees } from '../../angle-utils'
-import type { SanitizeRule } from '../types'
+import type { FixableSanitizeRule } from '../types'
 
 /**
  * A rotation origin only means anything when there is a rotation. Left on a key
@@ -17,7 +17,7 @@ function hasStaleOrigin(key: Key): boolean {
   return (key.rotation_x ?? 0) !== 0 || (key.rotation_y ?? 0) !== 0
 }
 
-export const staleRotationOriginRule: SanitizeRule = {
+export const staleRotationOriginRule: FixableSanitizeRule = {
   id: 'stale-rotation-origin',
   kind: 'redundancy',
   name: 'Stale rotation origins',

@@ -8,6 +8,8 @@ export type SanitizeRuleId =
   | 'blank-label-text-size'
   | 'blank-label-text-color'
   | 'stale-rotation-origin'
+  | 'stale-stabilizer-rotation'
+  | 'key-collisions'
 
 /**
  * Helper class for interacting with the Sanitize Layout tool.
@@ -78,8 +80,18 @@ export class SanitizeToolHelper {
   }
 
   /** The group container for one rule kind. */
-  getGroup(kind: 'redundancy' | 'normalization'): Locator {
+  getGroup(kind: 'redundancy' | 'normalization' | 'advisory'): Locator {
     return this.page.locator(`[data-testid="sanitize-group-${kind}"]`)
+  }
+
+  /** The banner naming warning-only rules that still need attention. */
+  getWarningBanner(): Locator {
+    return this.page.locator('[data-testid="sanitize-warnings"]')
+  }
+
+  /** The "Select" action on a warning row, which selects its keys on canvas. */
+  getSelectButton(ruleId: SanitizeRuleId): Locator {
+    return this.page.locator(`[data-testid="sanitize-select-${ruleId}"]`)
   }
 
   // ==================== Actions ====================
@@ -146,6 +158,21 @@ export class SanitizeToolHelper {
 
   async expectCheckboxDisabled(ruleId: SanitizeRuleId): Promise<void> {
     await expect(this.getCategoryCheckbox(ruleId)).toBeDisabled()
+  }
+
+  /**
+   * Assert a rule has no checkbox at all. Warning-only rules must not render a
+   * permanently disabled one — that reads as "already clean".
+   */
+  async expectNoCheckbox(ruleId: SanitizeRuleId): Promise<void> {
+    await expect(this.getRuleRow(ruleId)).toBeVisible()
+    await expect(this.getCategoryCheckbox(ruleId)).toHaveCount(0)
+  }
+
+  /** Click a warning row's Select action. */
+  async select(ruleId: SanitizeRuleId): Promise<void> {
+    await this.getSelectButton(ruleId).click()
+    await this.waitHelpers.waitForDoubleAnimationFrame()
   }
 
   async expectApplyEnabled(): Promise<void> {

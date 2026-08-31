@@ -364,6 +364,14 @@ export const useKeyboardStore = defineStore('keyboard', () => {
     selectedKeys.value = [...keys.value]
   }
 
+  /**
+   * Replace the selection with a specific set of keys. Copies the array so the
+   * caller's own list can't alias the store's selection.
+   */
+  const selectKeys = (target: readonly Key[]) => {
+    selectedKeys.value = [...target]
+  }
+
   const unselectAll = () => {
     selectedKeys.value = []
   }
@@ -1734,6 +1742,7 @@ export const useKeyboardStore = defineStore('keyboard', () => {
     deleteKeys,
     selectKey,
     selectAll,
+    selectKeys,
     unselectAll,
     showKeySelectionPopup,
     hideKeySelectionPopup,

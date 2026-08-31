@@ -1,6 +1,6 @@
 import type { Key } from '@adamws/kle-serial'
 import { normalizeAngleDegrees, normalizeAngleDegrees360 } from '../../angle-utils'
-import type { SanitizeRule } from '../types'
+import type { FixableSanitizeRule } from '../types'
 
 /**
  * A rotation of 3600 degrees puts a key exactly where a rotation of 0 does, and
@@ -28,7 +28,7 @@ function needsNormalization(key: Key): boolean {
   )
 }
 
-export const rotationAngleRule: SanitizeRule = {
+export const rotationAngleRule: FixableSanitizeRule = {
   id: 'rotation-angle',
   kind: 'normalization',
   name: 'Rotation angles',

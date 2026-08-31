@@ -397,6 +397,82 @@ describe('SanitizeToolPanel', () => {
     })
   })
 
+  describe('warning-only rules', () => {
+    /** Two keys overlapping by half a unit, and nothing else wrong. */
+    function seedCollidingLayout() {
+      store.keys = [makeKey({ x: 0, y: 0 }), makeKey({ x: 0.5, y: 0 })]
+    }
+
+    it('groups warnings separately from fixable rules', async () => {
+      await open()
+
+      expect(wrapper.find('[data-testid="sanitize-group-advisory"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="sanitize-group-advisory"]').text()).toContain('Warnings')
+    })
+
+    it('renders no checkbox for a rule that cannot fix itself', async () => {
+      await open()
+
+      expect(wrapper.find('[data-testid="sanitize-checkbox-key-collisions"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="sanitize-count-key-collisions"]').exists()).toBe(true)
+    })
+
+    it('leaves the warning standing after an Apply', async () => {
+      seedCollidingLayout()
+      await open()
+
+      expect(count('key-collisions')).toBe('1')
+      // Nothing fixable to do, so Apply is off — and the overlap is still there.
+      expect(applyButton().attributes('disabled')).toBeDefined()
+      expect(count('key-collisions')).toBe('1')
+    })
+
+    it('says the layout is otherwise clean but still needs review', async () => {
+      seedCollidingLayout()
+      await open()
+
+      const banner = wrapper.get('[data-testid="sanitize-warnings"]').text()
+      expect(banner).toContain('Nothing to clean up.')
+      expect(banner).toContain('Overlapping keys')
+      // The "all clear" banner must not claim the layout is fine.
+      expect(wrapper.find('.clean-banner').exists()).toBe(false)
+    })
+
+    it('shows no warning banner when there is nothing to warn about', async () => {
+      store.keys = [makeKey({ x: 0, y: 0 })]
+      await open()
+
+      expect(wrapper.find('[data-testid="sanitize-warnings"]').exists()).toBe(false)
+      expect(wrapper.find('.clean-banner').exists()).toBe(true)
+    })
+
+    it('drops the "otherwise clean" lead while fixable issues remain', async () => {
+      await open()
+
+      expect(wrapper.get('[data-testid="sanitize-warnings"]').text()).not.toContain(
+        'Nothing to clean up.',
+      )
+    })
+
+    it('selects the offending keys on canvas', async () => {
+      seedCollidingLayout()
+      await open()
+
+      await wrapper.get('[data-testid="sanitize-select-key-collisions"]').trigger('click')
+
+      expect(store.selectedKeys).toHaveLength(2)
+      expect(store.selectedKeys).toContain(store.keys[0])
+      expect(store.selectedKeys).toContain(store.keys[1])
+    })
+
+    it('offers no Select action when there is nothing to select', async () => {
+      store.keys = [makeKey({ x: 0, y: 0 })]
+      await open()
+
+      expect(wrapper.find('[data-testid="sanitize-select-key-collisions"]').exists()).toBe(false)
+    })
+  })
+
   describe('closing', () => {
     it('emits close from the Close button', async () => {
       await open()

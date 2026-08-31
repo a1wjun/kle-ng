@@ -1,9 +1,9 @@
 import { isLabelBlank } from '../label-utils'
-import type { SanitizeRule } from '../types'
+import type { FixableSanitizeRule } from '../types'
 
 const LABEL_COUNT = 12
 
-export const blankLabelTextColorRule: SanitizeRule = {
+export const blankLabelTextColorRule: FixableSanitizeRule = {
   id: 'blank-label-text-color',
   kind: 'redundancy',
   name: 'Orphaned text colors',

@@ -8,6 +8,11 @@ import { makeKey } from './fixtures'
  * A layout carrying every issue type at once: offset from the origin, a
  * whitespace-only label, orphaned size/color overrides, a stale rotation origin
  * and an out-of-range rotation angle. Includes both a rotated and an unrotated key.
+ *
+ * `b` is rotated about its own top-left corner, which swings its lower-left
+ * corner into `a` — so this layout also carries one key collision. That is
+ * deliberate: it keeps the "a full apply leaves nothing behind" tests honest
+ * about the one issue an apply provably *cannot* resolve.
  */
 function dirtyLayout(): Key[] {
   const a = makeKey({ x: 3, y: 2, rotation_angle: 0, rotation_x: 1, rotation_y: 1 })
@@ -54,6 +59,14 @@ describe('scanLayout', () => {
     expect(countFor(results, 'blank-label-text-size')).toBe(1)
     expect(countFor(results, 'blank-label-text-color')).toBe(1)
     expect(countFor(results, 'stale-rotation-origin')).toBe(1)
+    expect(countFor(results, 'key-collisions')).toBe(1)
+  })
+
+  it('marks only the rules that have a fix as fixable', () => {
+    const results = scanLayout(dirtyLayout())
+
+    expect(results.find((r) => r.ruleId === 'key-collisions')!.fixable).toBe(false)
+    expect(results.find((r) => r.ruleId === 'whitespace-label')!.fixable).toBe(true)
   })
 
   it('does not mutate the layout it scans', () => {
@@ -72,7 +85,13 @@ describe('scanLayout', () => {
       SANITIZE_RULES.map((r) => r.id),
     )
 
-    expect(scanLayout(keys).every((r) => r.count === 0)).toBe(true)
+    // Fixable rules only: a warning rule reports something an apply was never
+    // going to touch, so it stays at its count and that is correct.
+    expect(
+      scanLayout(keys)
+        .filter((r) => r.fixable)
+        .every((r) => r.count === 0),
+    ).toBe(true)
   })
 })
 
@@ -161,8 +180,18 @@ describe('applySanitizeFixes', () => {
     )
 
     for (const rule of SANITIZE_RULES) {
+      if (!rule.fix) continue // reports only; an apply cannot clear it
       expect(rule.scan(keys).count, `${rule.id} should be clean`).toBe(0)
     }
+  })
+
+  it('naming a rule that has no fix changes nothing', () => {
+    const keys = dirtyLayout()
+    const before = structuredClone(keys)
+
+    applySanitizeFixes(keys, ['key-collisions'])
+
+    expect(keys).toEqual(before)
   })
 })
 
@@ -174,9 +203,18 @@ describe('rule registry', () => {
 
   it('gives every rule a kind, name and description', () => {
     for (const rule of SANITIZE_RULES) {
-      expect(['redundancy', 'normalization']).toContain(rule.kind)
+      expect(['redundancy', 'normalization', 'advisory']).toContain(rule.kind)
       expect(rule.name.length).toBeGreaterThan(0)
       expect(rule.description.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('gives every advisory rule no fix', () => {
+    // The panel renders an advisory rule without a checkbox and never selects
+    // it, so one that carried a fix would be silently unreachable.
+    for (const rule of SANITIZE_RULES) {
+      if (rule.kind !== 'advisory') continue
+      expect(rule.fix, `${rule.id} is advisory but has a fix`).toBeUndefined()
     }
   })
 

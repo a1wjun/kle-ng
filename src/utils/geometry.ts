@@ -156,6 +156,85 @@ export const orientedRectanglesIntersect = (
 }
 
 /**
+ * A rectangle described by its centre and half-extents, rotated about its own
+ * centre. `angle` is in degrees.
+ *
+ * This is the collision-detection counterpart to `OrientedRectangle` above, and
+ * differs from it in three ways that all matter:
+ *
+ * - **Centre + half-extents**, not corner + size, so a rotation never has to
+ *   carry a separate origin — callers bake the origin into the centre.
+ * - **Plain `number` arithmetic**, not `D`. `orientedRectanglesIntersect` runs
+ *   every operation through Decimal.js at roughly 900µs per call, which is fine
+ *   for one marquee test per drag but hopeless for an O(n²) sweep over a
+ *   thousand keys.
+ * - **Touching is not overlapping** (see `orientedBoxesOverlap`).
+ */
+export interface OrientedBox {
+  centerX: number
+  centerY: number
+  halfWidth: number
+  halfHeight: number
+  /** Degrees, clockwise — canvas convention, +y down. */
+  angle: number
+}
+
+/** The two unit axes of a box, in world space. */
+const boxAxes = (box: OrientedBox): [Point, Point] => {
+  const radians = (box.angle * Math.PI) / 180
+  const cos = Math.cos(radians)
+  const sin = Math.sin(radians)
+  return [
+    { x: cos, y: sin },
+    { x: -sin, y: cos },
+  ]
+}
+
+/** How far `box` extends from its centre along `axis` (a unit vector). */
+const projectionRadius = (box: OrientedBox, axes: [Point, Point], axis: Point): number => {
+  const [u, v] = axes
+  return (
+    box.halfWidth * Math.abs(u.x * axis.x + u.y * axis.y) +
+    box.halfHeight * Math.abs(v.x * axis.x + v.y * axis.y)
+  )
+}
+
+/**
+ * Separating Axis Theorem overlap test for two oriented boxes.
+ *
+ * Boxes that merely touch do **not** overlap: the penetration depth has to
+ * exceed `tolerance` on every axis. That convention is the opposite of
+ * `orientedRectanglesIntersect`, and it is the one collision detection needs —
+ * keys on a keyboard sit flush against their neighbours, so treating shared
+ * edges as intersections would flag every adjacent pair on the board.
+ *
+ * Only four axes are tested rather than the eight a general polygon SAT would
+ * produce: a rectangle's opposite edges are parallel, so each box contributes
+ * two distinct normals.
+ *
+ * @param tolerance - Minimum penetration, in the same units as the boxes, before
+ *   an overlap is reported. Absorbs float noise from rotation and from authored
+ *   coordinates.
+ */
+export const orientedBoxesOverlap = (a: OrientedBox, b: OrientedBox, tolerance = 0): boolean => {
+  const axesA = boxAxes(a)
+  const axesB = boxAxes(b)
+
+  const deltaX = b.centerX - a.centerX
+  const deltaY = b.centerY - a.centerY
+
+  for (const axis of [axesA[0], axesA[1], axesB[0], axesB[1]]) {
+    const distance = Math.abs(deltaX * axis.x + deltaY * axis.y)
+    const reach = projectionRadius(a, axesA, axis) + projectionRadius(b, axesB, axis)
+
+    // A gap, a shared edge, or an overlap too shallow to be real: separated.
+    if (reach - distance <= tolerance) return false
+  }
+
+  return true
+}
+
+/**
  * Convert a Key to an OrientedRectangle for collision detection
  */
 export const keyToOrientedRectangle = (key: Key, unit: number): OrientedRectangle => {

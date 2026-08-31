@@ -29,6 +29,14 @@
           <BiCheckCircle class="me-2" />
           <span>{{ lastAppliedMessage }}</span>
         </div>
+        <div
+          v-else-if="warningSummary"
+          class="status-banner warning-banner"
+          data-testid="sanitize-warnings"
+        >
+          <BiExclamationTriangle class="me-2" />
+          <span>{{ warningSummary }}</span>
+        </div>
         <div v-else-if="isClean" class="status-banner clean-banner">
           <BiCheckCircle class="me-2" />
           <span>Nothing to clean up.</span>
@@ -49,7 +57,7 @@
             class="rule-row"
             :data-testid="`sanitize-rule-${result.ruleId}`"
           >
-            <div class="form-check">
+            <div class="form-check" v-if="result.fixable">
               <input
                 class="form-check-input"
                 type="checkbox"
@@ -73,6 +81,38 @@
                 </span>
                 <span class="rule-description">{{ result.description }}</span>
               </label>
+            </div>
+
+            <!-- Warning-only rule: no checkbox at all. A permanently disabled one
+                 would read as "already clean", which is the opposite of the truth. -->
+            <div v-else class="warning-check">
+              <BiExclamationTriangle
+                class="warning-icon"
+                :class="{ 'has-issues': result.count > 0 }"
+              />
+              <div class="rule-body" :class="{ 'is-clear': result.count === 0 }">
+                <span class="rule-heading">
+                  <span class="rule-name">{{ result.name }}</span>
+                  <button
+                    v-if="result.count > 0 && result.keys?.length"
+                    type="button"
+                    class="select-link"
+                    :data-testid="`sanitize-select-${result.ruleId}`"
+                    :title="`Select the ${result.keys.length} affected keys on canvas`"
+                    @click="handleSelect(result)"
+                  >
+                    Select
+                  </button>
+                  <span
+                    class="count-badge"
+                    :class="badgeClass(result)"
+                    :data-testid="`sanitize-count-${result.ruleId}`"
+                  >
+                    {{ result.count }}
+                  </span>
+                </span>
+                <span class="rule-description">{{ result.description }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -124,6 +164,7 @@ import BiMagic from 'bootstrap-icons/icons/magic.svg'
 import BiArrowRepeat from 'bootstrap-icons/icons/arrow-repeat.svg'
 import BiXCircle from 'bootstrap-icons/icons/x-circle.svg'
 import BiCheckCircle from 'bootstrap-icons/icons/check-circle.svg'
+import BiExclamationTriangle from 'bootstrap-icons/icons/exclamation-triangle.svg'
 
 interface Props {
   visible?: boolean
@@ -154,9 +195,12 @@ const { position, panelRef, handleMouseDown, handleHeaderMouseDown, initializePo
     headerHeight: 45,
   })
 
+// Insertion order is render order, so warnings sit last — below everything the
+// Apply button can actually act on.
 const GROUP_TITLES: Record<SanitizeRuleKind, string> = {
   redundancy: 'Redundant data',
   normalization: 'Normalization',
+  advisory: 'Warnings',
 }
 
 // Derived from scanResults rather than hardcoded, so a future rule lands in the
@@ -176,8 +220,25 @@ const isClean = computed(
 )
 
 const canApply = computed(() =>
-  scanResults.value.some((r) => selectedRuleIds.value.has(r.ruleId) && r.count > 0),
+  scanResults.value.some((r) => r.fixable && selectedRuleIds.value.has(r.ruleId) && r.count > 0),
 )
+
+/**
+ * The standing "you still have to look at this" line, for rules that report but
+ * can't act. Worded from the rule names rather than hardcoding what any one rule
+ * found, so a second warning rule needs no change here.
+ */
+const warningSummary = computed(() => {
+  const warnings = scanResults.value.filter((r) => !r.fixable && r.count > 0)
+  if (warnings.length === 0) return ''
+
+  const names = warnings.map((r) => r.name).join(', ')
+  // Only claim the layout is otherwise clean when it actually is.
+  const lead = scanResults.value.some((r) => r.fixable && r.count > 0)
+    ? ''
+    : 'Nothing to clean up. '
+  return `${lead}${names} need review — Sanitize can't fix ${warnings.length === 1 ? 'this' : 'these'}.`
+})
 
 // The two kinds are counted on different scales — per-field for redundancy, and
 // per-rule scales for normalization (a whole-layout recentre vs. a tally of keys)
@@ -202,16 +263,26 @@ const lastAppliedMessage = computed(() => {
 
 function badgeClass(result: SanitizeCategorySummary): string {
   if (result.count === 0) return 'text-bg-secondary'
+  // `text-bg-warning` is already redundancy's, so warnings take danger.
+  if (!result.fixable) return 'text-bg-danger'
   return result.kind === 'normalization' ? 'text-bg-info' : 'text-bg-warning'
 }
 
 function runScan(resetSelection: boolean) {
   scanResults.value = scanLayout(keyboardStore.keys)
   if (resetSelection) {
+    // Non-fixable rules are never selected: a ticked box that Apply ignores is a
+    // promise the tool can't keep.
     selectedRuleIds.value = new Set(
-      scanResults.value.filter((r) => r.count > 0).map((r) => r.ruleId),
+      scanResults.value.filter((r) => r.fixable && r.count > 0).map((r) => r.ruleId),
     )
   }
+}
+
+/** Put the offending keys under the user's cursor — all a warning rule can offer. */
+function handleSelect(result: SanitizeCategorySummary) {
+  if (!result.keys?.length) return
+  keyboardStore.selectKeys(result.keys)
 }
 
 function toggleRule(ruleId: string) {
@@ -235,7 +306,7 @@ function handleApply() {
   runScan(false)
 
   const applied = scanResults.value.filter(
-    (r) => selectedRuleIds.value.has(r.ruleId) && r.count > 0,
+    (r) => r.fixable && selectedRuleIds.value.has(r.ruleId) && r.count > 0,
   )
   if (applied.length === 0) {
     // Nothing left to do: drop any earlier result rather than let it stand as a
@@ -400,6 +471,11 @@ onUnmounted(() => {
   color: var(--bs-emphasis-color);
 }
 
+.warning-banner {
+  background: var(--bs-warning-bg-subtle);
+  border-color: var(--bs-warning-border-subtle);
+}
+
 .controls-section {
   background: var(--bs-tertiary-bg);
   border: 1px solid var(--bs-border-color);
@@ -450,6 +526,39 @@ onUnmounted(() => {
   cursor: default;
 }
 
+/*
+ * The warning-rule counterpart to `.form-check`: same indent, with a static icon
+ * where the checkbox would be. It carries no input, so nothing here is a label.
+ */
+.warning-check {
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.warning-icon {
+  position: absolute;
+  left: 0;
+  top: 0.15rem;
+  width: 1em;
+  height: 1em;
+  color: var(--bs-secondary-color);
+}
+
+.warning-icon.has-issues {
+  color: var(--bs-danger);
+}
+
+.rule-body {
+  display: block;
+  width: 100%;
+  color: var(--bs-emphasis-color);
+}
+
+/* Matches the dimming a disabled checkbox gives the fixable rows. */
+.rule-body.is-clear {
+  opacity: 0.65;
+}
+
 .rule-heading {
   display: flex;
   align-items: center;
@@ -457,6 +566,28 @@ onUnmounted(() => {
   gap: 8px;
   font-size: 0.8125rem;
   line-height: 1.25;
+}
+
+/*
+ * Sits inline on the heading row rather than on a line of its own — the panel
+ * body is sized never to scroll, and a third line per rule would break that.
+ * `margin-left: auto` keeps it grouped with the badge on the right.
+ */
+.select-link {
+  flex: none;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.6875rem;
+  line-height: 1;
+  text-decoration: underline;
+  color: var(--bs-link-color);
+  cursor: pointer;
+}
+
+.select-link:hover {
+  color: var(--bs-link-hover-color);
 }
 
 .rule-name {

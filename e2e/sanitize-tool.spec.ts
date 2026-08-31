@@ -96,6 +96,41 @@ test.describe('Sanitize Layout tool', () => {
     await expect(
       sanitize.getGroup('redundancy').locator('[data-testid="sanitize-rule-whitespace-label"]'),
     ).toBeVisible()
+
+    // Warnings get their own group, and no checkbox — this fixture's keys don't
+    // overlap, but the row is still listed so its clean state is visible.
+    await expect(
+      sanitize.getGroup('advisory').locator('[data-testid="sanitize-rule-key-collisions"]'),
+    ).toBeVisible()
+    await sanitize.expectCount('key-collisions', 0)
+    await sanitize.expectNoCheckbox('key-collisions')
+  })
+
+  test('warns about overlapping keys without offering to fix them', async ({ page }) => {
+    // Two 1u keys half a unit apart: a layout that cannot be built, and whose
+    // resolution is the user's call, not the tool's.
+    await canvasHelper.loadJsonLayout(JSON.stringify([[{ x: 0, y: 0 }, 'A', { x: -0.5 }, 'B']]))
+
+    await sanitize.openPanel()
+
+    await sanitize.expectCount('key-collisions', 1)
+    await sanitize.expectNoCheckbox('key-collisions')
+
+    // Nothing here is fixable, so the banner has to say so rather than leaving
+    // the "Nothing to clean up." all-clear standing on its own.
+    await expect(sanitize.getWarningBanner()).toBeVisible()
+    await expect(sanitize.getWarningBanner()).toContainText('Overlapping keys')
+    await expect(sanitize.getCleanBanner()).toBeHidden()
+    await sanitize.expectApplyDisabled()
+    await sanitize.expectNoScroll()
+
+    // The one recourse a warning can offer: put the offenders under the cursor.
+    await sanitize.select('key-collisions')
+    await expect(page.getByText('Selected: 2')).toBeVisible()
+
+    // Still reported after a rescan — nothing silently resolved it.
+    await sanitize.rescan()
+    await sanitize.expectCount('key-collisions', 1)
   })
 
   test('fits without scrolling, with every rule described on screen', async () => {

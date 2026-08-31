@@ -216,10 +216,14 @@ let copiedTimer: ReturnType<typeof setTimeout> | null = null
 
 // Reactive so it stays current if the user opens Sanitize Layout, fixes issues,
 // and comes back — no manual re-scan needed. Sums every rule's count across both
-// kinds (redundancy + normalization) purely as a "there's something here" signal;
-// this is not shown anywhere alongside a breakdown, so the two scales mixing is fine.
+// fixable kinds (redundancy + normalization) purely as a "there's something here"
+// signal; this is not shown anywhere alongside a breakdown, so the two scales
+// mixing is fine. Warning-only rules are excluded: the copy below offers a
+// cleanup, and an issue the tool cannot fix would make that offer false.
 const sanitizeIssueCount = computed(() =>
-  scanLayout(keyboardStore.keys).reduce((sum, result) => sum + result.count, 0),
+  scanLayout(keyboardStore.keys)
+    .filter((result) => result.fixable)
+    .reduce((sum, result) => sum + result.count, 0),
 )
 
 // Sends the user to fix things up rather than blocking them — Create short link

@@ -27,6 +27,21 @@ export interface LayoutOptionGroup {
 }
 
 /**
+ * A key together with the position it occupies in a collapsed layout.
+ *
+ * Collapsing translates alternative-layout keys onto their true location, which
+ * means the position in the result is not the position stored on the key. A
+ * placement carries the adjusted coordinates *beside* the original `Key` rather
+ * than in a clone of it, so callers that need to point back at the layout — to
+ * select the offending keys on canvas, say — still hold the real object.
+ */
+export interface KeyPlacement {
+  key: Key
+  x: number
+  y: number
+}
+
+/**
  * Enumerate layout option groups from a key array, optionally enriched with
  * VIA layouts.labels metadata.
  *
@@ -77,6 +92,34 @@ export function getLayoutOptionGroups(keys: Key[], viaLabels?: unknown): LayoutO
  * @returns New key array with only the relevant keys, positions adjusted
  */
 export function collapseToLayoutChoices(keys: Key[], choices: Map<number, number>): Key[] {
+  // Shallow-clone so callers can't mutate the store's objects through the result.
+  // Shallow is sufficient: collapsing only adjusts x/y (scalar properties).
+  return collapseToLayoutChoicePlacements(keys, choices).map((placement) => ({
+    ...placement.key,
+    x: placement.x,
+    y: placement.y,
+  }))
+}
+
+/**
+ * The placement-level form of {@link collapseToLayoutChoices}: same selection,
+ * same translation, same de-duplication, but each entry points back at the
+ * original `Key` instead of a clone.
+ *
+ * Use this when the caller needs to identify the keys it got back — reporting
+ * them, selecting them on canvas. Use `collapseToLayoutChoices` when it just
+ * needs a detached layout to render.
+ *
+ * The input array is NOT mutated.
+ *
+ * @param keys - Source key array (not mutated)
+ * @param choices - Map of option → chosen choice index
+ * @returns Placements for the relevant keys, positions adjusted
+ */
+export function collapseToLayoutChoicePlacements(
+  keys: Key[],
+  choices: Map<number, number>,
+): KeyPlacement[] {
   // Build option→choice→keys map against originals (no upfront clone needed)
   const optionGroups = new Map<number, Map<number, Key[]>>()
   for (const key of keys) {
@@ -89,47 +132,43 @@ export function collapseToLayoutChoices(keys: Key[], choices: Map<number, number
   }
 
   // Always include keys with no option,choice.
-  // Shallow-clone each key so callers can't mutate the store's objects through the result.
-  const activeKeys: Key[] = []
+  const active: KeyPlacement[] = []
   for (const key of keys) {
     if (!key.ghost && !key.decal && parseOptionChoice(key) === null) {
-      activeKeys.push({ ...key })
+      active.push({ key, x: key.x, y: key.y })
     }
   }
 
   // For each option group pick the right choice and translate non-zero choices.
-  // Shallow-copy is sufficient: this function only modifies x/y (scalar properties).
   for (const [option, choiceMap] of optionGroups) {
     const targetChoice = choices.get(option) ?? 0
     const choiceKeys = choiceMap.get(targetChoice) ?? choiceMap.get(0) ?? []
 
+    let dx = 0
+    let dy = 0
     if (targetChoice !== 0) {
-      const choice0Keys = choiceMap.get(0) ?? []
-      const anchor = minXY(choice0Keys)
+      const anchor = minXY(choiceMap.get(0) ?? [])
       const groupAnchor = minXY(choiceKeys)
       if (anchor && groupAnchor) {
-        const dx = anchor.x - groupAnchor.x
-        const dy = anchor.y - groupAnchor.y
-        activeKeys.push(...choiceKeys.map((key) => ({ ...key, x: key.x + dx, y: key.y + dy })))
-      } else {
-        activeKeys.push(...choiceKeys.map((key) => ({ ...key })))
+        dx = anchor.x - groupAnchor.x
+        dy = anchor.y - groupAnchor.y
       }
-    } else {
-      activeKeys.push(...choiceKeys.map((key) => ({ ...key })))
     }
+
+    active.push(...choiceKeys.map((key) => ({ key, x: key.x + dx, y: key.y + dy })))
   }
 
   // Dedupe by (labels[0], rotated center x, rotated center y, decal flag)
   const seen = new Set<string>()
-  const result: Key[] = []
-  for (const key of activeKeys) {
-    const center = getKeyCenter(key)
+  const result: KeyPlacement[] = []
+  for (const placement of active) {
+    const center = placementCenter(placement)
     const cx = Math.round(center.x * 10000) / 10000
     const cy = Math.round(center.y * 10000) / 10000
-    const dedupeKey = `${key.labels[0]}|${cx}|${cy}|${key.decal}`
+    const dedupeKey = `${placement.key.labels[0]}|${cx}|${cy}|${placement.key.decal}`
     if (!seen.has(dedupeKey)) {
       seen.add(dedupeKey)
-      result.push(key)
+      result.push(placement)
     }
   }
 
@@ -236,6 +275,16 @@ function parseViaLabels(viaLabels: unknown): LabelInfo[] {
     }
     return {}
   })
+}
+
+/**
+ * Rotation-aware centre of a key at its placed position, which is not
+ * necessarily the position stored on the key.
+ */
+function placementCenter(placement: KeyPlacement): { x: number; y: number } {
+  const { key, x, y } = placement
+  if (x === key.x && y === key.y) return getKeyCenter(key)
+  return getKeyCenter({ ...key, x, y })
 }
 
 function minXY(keys: Key[]): { x: number; y: number } | null {

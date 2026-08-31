@@ -2,7 +2,7 @@ import type { Key } from '@adamws/kle-serial'
 import { D } from '../../decimal-math'
 import { normalizeAngleDegrees } from '../../angle-utils'
 import { BoundsCalculator } from '../../utils/BoundsCalculator'
-import type { SanitizeRule } from '../types'
+import type { FixableSanitizeRule } from '../types'
 
 /**
  * Below this magnitude the layout counts as already normalized.
@@ -38,7 +38,7 @@ function isNormalized(dx: number, dy: number): boolean {
   return Math.abs(dx) < EPSILON && Math.abs(dy) < EPSILON
 }
 
-export const coordinateOffsetRule: SanitizeRule = {
+export const coordinateOffsetRule: FixableSanitizeRule = {
   id: 'coordinate-offset',
   kind: 'normalization',
   name: 'Layout position',

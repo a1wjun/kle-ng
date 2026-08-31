@@ -1,4 +1,4 @@
-import type { SanitizeRule } from '../types'
+import type { FixableSanitizeRule } from '../types'
 
 const LABEL_COUNT = 12
 
@@ -10,7 +10,7 @@ function isWhitespaceOnly(label: string | undefined): boolean {
   return typeof label === 'string' && label !== '' && label.trim() === ''
 }
 
-export const whitespaceLabelRule: SanitizeRule = {
+export const whitespaceLabelRule: FixableSanitizeRule = {
   id: 'whitespace-label',
   kind: 'redundancy',
   name: 'Whitespace-only labels',

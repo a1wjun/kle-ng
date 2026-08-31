@@ -1,5 +1,5 @@
 import type { Key } from '@adamws/kle-serial'
-import type { SanitizeRule } from '../types'
+import type { FixableSanitizeRule } from '../types'
 
 /**
  * A stabilizer only exists on a key that is wider or taller than 1u — the plate
@@ -19,7 +19,7 @@ function hasStaleStabRotation(key: Key): boolean {
   return (key.stabRotation ?? 0) !== 0
 }
 
-export const staleStabilizerRotationRule: SanitizeRule = {
+export const staleStabilizerRotationRule: FixableSanitizeRule = {
   id: 'stale-stabilizer-rotation',
   kind: 'redundancy',
   name: 'Stale stabilizer rotations',

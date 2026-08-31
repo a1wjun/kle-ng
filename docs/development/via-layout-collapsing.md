@@ -97,6 +97,16 @@ variant of each option group, with non-zero choices translated onto the choice-0
 de-duplicated. Ghost/decal keys with no option are dropped. Used by `KeyboardCanvas.vue`'s
 `keysForRender` for the layout-option preview toolbar.
 
+### `collapseToLayoutChoicePlacements(keys, choices)` — the same, without cloning
+
+`collapseToLayoutChoices` is a thin wrapper over this. It does all the work and returns
+`KeyPlacement[]` — `{ key, x, y }`, where `key` is the **original object** and `x`/`y` are the
+collapsed coordinates — instead of shallow clones carrying the adjusted position.
+
+Use it when the caller has to identify the keys it gets back rather than just draw them.
+`findLayoutCollisions` does: it reports the offending keys so the Sanitize panel can select them on
+canvas, which a clone could not do.
+
 ### `collapseViaLayout(keys)` — superset (plate, matches PCB)
 
 A faithful port of kbplacer's `collapse()`:
@@ -117,10 +127,11 @@ The input array is never mutated (keys are shallow-cloned; only scalar `x`/`y` a
 
 ## 5. Where collapsing is applied
 
-| Pipeline  | Entry point                             | How collapsing happens                                                                                                               |
-| --------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **PCB**   | `pcbGenerator.ts` → `pcbApi.submitTask` | Sends the **raw** serialized layout; the kle-ng-api backend runs kbplacer, which calls `MatrixAnnotatedKeyboard.collapse()`.         |
-| **Plate** | `plateGenerator.ts` → `generatePlate()` | Calls `collapseViaLayout(keyboardStore.keys)` when `isViaAnnotated`, **before** the JSON round-trip and `postMessage` to the worker. |
+| Pipeline                | Entry point                                    | How collapsing happens                                                                                                                                                                                                                                                                                |
+| ----------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PCB**                 | `pcbGenerator.ts` → `pcbApi.submitTask`        | Sends the **raw** serialized layout; the kle-ng-api backend runs kbplacer, which calls `MatrixAnnotatedKeyboard.collapse()`.                                                                                                                                                                          |
+| **Plate**               | `plateGenerator.ts` → `generatePlate()`        | Calls `collapseViaLayout(keyboardStore.keys)` when `isViaAnnotated`, **before** the JSON round-trip and `postMessage` to the worker.                                                                                                                                                                  |
+| **Collision detection** | `key-collisions.ts` → `findLayoutCollisions()` | Builds **one variant per layout choice** with `collapseToLayoutChoicePlacements` and checks each separately. Deliberately _not_ a superset: the superset overlaps by construction (a 2U backspace and the two 1U keys that replace it), so checking it would report every alternative as a collision. |
 
 Injecting in the plate **store** (rather than inside `buildPlate`/the worker) keeps the plate builder
 layout-agnostic and mirrors how `KeyboardCanvas.vue` collapses in the component layer. Because the
