@@ -3,6 +3,7 @@ import { promises as fs } from 'fs'
 import { KeyboardEditorPage } from './pages/KeyboardEditorPage'
 import { WaitHelpers } from './helpers/wait-helpers'
 import { ExtraToolsComponent } from './pages/components/ExtraToolsComponent'
+import { PresetComponent } from './pages/components/PresetComponent'
 
 // Helper function to export and parse layout JSON
 async function exportLayoutJSON(page: import('@playwright/test').Page) {
@@ -509,22 +510,9 @@ test.describe('Matrix Coordinates Tool', () => {
 
     const editor = new KeyboardEditorPage(page)
 
-    // Open the Import dropdown, which holds the presets
-    const presetButton = page.locator('[data-testid="button-import"]')
-    await presetButton.click()
-
-    // Wait for dropdown items to be in DOM
-    await expect(
-      page.locator('[data-testid="import-from-preset"] .dropdown-item').first(),
-    ).toBeAttached({
-      timeout: 5000,
-    })
-
-    // Click the Multilayout 60% (VIA) preset item
-    const viaItem = page.locator('[data-testid="import-from-preset"] .dropdown-item', {
-      hasText: 'Multilayout 60% (VIA)',
-    })
-    await viaItem.click()
+    // Presets are addressed by name; the page object knows whether that means the
+    // Import menu's shortlist or the full library modal.
+    await new PresetComponent(page, waitHelpers).selectPreset('Multilayout 60% (VIA)')
 
     // Wait for layout to load - Multilayout 60% has 83 keys
     await expect

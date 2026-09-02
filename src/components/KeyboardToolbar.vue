@@ -58,16 +58,26 @@
                 From VIA
               </a>
             </li>
+            <!-- Sits last in the sources group rather than first, so it is adjacent to
+                 the shortlist below: that adjacency is the only hint that the six named
+                 entries are a selection from a larger library. -->
+            <li>
+              <a
+                class="dropdown-item"
+                data-testid="import-from-preset-browse"
+                href="#"
+                @click.prevent="showPresetImportModal = true"
+              >
+                From Preset
+              </a>
+            </li>
 
             <!-- Presets are just another way to start a layout, so they live with the
                  other sources rather than owning a slot in the header. The heading band
-                 separates the two groups, so no divider above it. -->
-            <li><h6 class="dropdown-header">Presets</h6></li>
-            <li
-              v-for="preset in availablePresets"
-              :key="preset.file"
-              data-testid="import-from-preset"
-            >
+                 separates the two groups, so no divider above it. Only the curated few
+                 are listed; the rest are behind "From Preset" above. -->
+            <li><h6 class="dropdown-header">Top Presets</h6></li>
+            <li v-for="preset in TOP_PRESETS" :key="preset.file" data-testid="import-from-preset">
               <a class="dropdown-item" href="#" @click.prevent="loadPreset(preset)">
                 {{ preset.name }}
               </a>
@@ -244,6 +254,7 @@
 
     <!-- Import modals -->
     <UrlImportModal :is-visible="showUrlImportModal" @close="showUrlImportModal = false" />
+    <PresetImportModal :is-visible="showPresetImportModal" @close="showPresetImportModal = false" />
     <QmkImportModal :is-visible="showQmkImportModal" @close="showQmkImportModal = false" />
     <ViaImportModal :is-visible="showViaImportModal" @close="showViaImportModal = false" />
     <MyLayoutsModal :is-visible="showMyLayoutsModal" @close="showMyLayoutsModal = false" />
@@ -255,13 +266,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useKeyboardStore } from '@/stores/keyboard'
-import presetsMetadata from '@/data/presets.json'
+import { TOP_PRESETS, applyPreset, type Preset } from '@/utils/presets'
 import { toast } from '@/composables/useToast'
 import { useKeyboardExport } from '@/composables/useKeyboardExport'
 import { useKeyboardImport } from '@/composables/useKeyboardImport'
 import UrlImportModal from './UrlImportModal.vue'
+import PresetImportModal from './PresetImportModal.vue'
 import QmkImportModal from './QmkImportModal.vue'
 import ViaImportModal from './ViaImportModal.vue'
 import MyLayoutsModal from './MyLayoutsModal.vue'
@@ -275,29 +287,11 @@ const keyboardStore = useKeyboardStore()
 const authStore = useAuthStore()
 const shortLinksStore = useShortLinksStore()
 
-interface Preset {
-  name: string
-  file: string
-}
-
-const availablePresets = ref<Preset[]>([])
-
-onMounted(() => {
-  availablePresets.value = presetsMetadata.presets || []
-})
-
+// Loading goes through utils/presets.ts so this shortcut and the "From Preset"
+// modal cannot drift apart.
 const loadPreset = async (preset: Preset) => {
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}data/presets/${preset.file}`)
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-    const presetData = await response.json()
-
-    keyboardStore.loadKLELayout(presetData)
-    // Name the download after the preset. Without this it would fall back to
-    // 'keyboard-layout', since loading clears whatever filename came before.
-    keyboardStore.filename = preset.file.replace(/\.[^/.]+$/, '')
+    await applyPreset(preset, keyboardStore)
   } catch (error) {
     console.error('Error loading preset:', error)
     toast.showError(`Failed to load ${preset.name}`, 'Error loading preset')
@@ -325,6 +319,7 @@ const { triggerFileUpload, handleFileUpload } = useKeyboardImport(fileInput)
 
 // Modal visibility
 const showUrlImportModal = ref(false)
+const showPresetImportModal = ref(false)
 const showQmkImportModal = ref(false)
 const showMyLayoutsModal = ref(false)
 const showViaImportModal = ref(false)
@@ -366,9 +361,9 @@ const shareLayout = async () => {
   min-height: 38px;
 }
 
-/* The presets section makes this the one long menu in the header. Cap it against the
-   viewport rather than a fixed height, so it only scrolls when it genuinely cannot
-   fit: the allowance covers the header above it plus a margin at the bottom. */
+/* Still the longest menu in the header, even with only the top presets listed. Cap it
+   against the viewport rather than a fixed height, so it only scrolls when it genuinely
+   cannot fit: the allowance covers the header above it plus a margin at the bottom. */
 .import-menu {
   max-height: calc(100vh - 5rem);
   overflow-y: auto;

@@ -107,12 +107,21 @@ export const SELECTORS = {
   },
 
   /**
-   * Presets, which are a section of the Import dropdown
+   * Presets, which live on two surfaces: a curated shortlist inside the Import
+   * dropdown, and the whole library in the "From Preset" modal.
    */
   PRESET: {
     DROPDOWN: '.import-menu',
     SELECT_BUTTON: '[data-testid="button-import"]',
+    /** One of the curated presets listed directly in the Import menu */
     DROPDOWN_ITEM: '[data-testid="import-from-preset"] .dropdown-item',
+    /** The Import menu entry that opens the full library */
+    BROWSE_ITEM: '[data-testid="import-from-preset-browse"]',
+    MODAL: '[data-testid="modal-preset-import"]',
+    SEARCH: '[data-testid="preset-search"]',
+    CARD: '[data-testid="preset-card"]',
+    COUNT: '[data-testid="preset-count"]',
+    EMPTY_STATE: '[data-testid="preset-empty-state"]',
   },
 
   /**

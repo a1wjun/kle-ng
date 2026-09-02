@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import KeyboardToolbar from '../KeyboardToolbar.vue'
+import PresetImportModal from '../PresetImportModal.vue'
+import { clearPresetCache } from '@/utils/presets'
 import { useKeyboardStore, Key } from '@/stores/keyboard'
 import { useAuthStore } from '@/stores/auth'
 import { useShortLinksStore } from '@/stores/short-links'
@@ -16,12 +18,15 @@ vi.mock('@/composables/useToast', () => ({
   },
 }))
 
-// Mock presets data using existing files
+// Mock presets data using existing files. Both are in TOP_PRESET_FILES, since the
+// dropdown lists only the curated shortlist; ansi-104 precedes default-60 there, so
+// these arrive in the order they are written here.
 vi.mock('@/data/presets.json', () => ({
   default: {
     presets: [
-      { name: 'Test Layout 1', file: 'planck.json' },
-      { name: 'Test Layout 2', file: 'ansi-104.json' },
+      { name: 'Test Layout 1', file: 'ansi-104.json' },
+      { name: 'Test Layout 2', file: 'default-60.json' },
+      { name: 'Not Promoted', file: 'ergodox.json' },
     ],
   },
 }))
@@ -29,6 +34,9 @@ vi.mock('@/data/presets.json', () => ({
 describe('KeyboardToolbar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Preset downloads are memoised for the session, so without this a later test's
+    // click is served from the cache and never reaches the fetch spy.
+    clearPresetCache()
     setActivePinia(createPinia())
   })
 
@@ -49,11 +57,37 @@ describe('KeyboardToolbar', () => {
 
       const importMenu = wrapper.find('.import-menu')
       expect(importMenu.exists()).toBe(true)
-      expect(importMenu.text()).toContain('Presets')
+      expect(importMenu.text()).toContain('Top Presets')
       expect(presetItems(wrapper).length).toBeGreaterThan(0)
 
       // The standalone preset dropdown is gone from the header
       expect(wrapper.find('.preset-dropdown').exists()).toBe(false)
+    })
+
+    it('should offer From Preset as a way into the whole library', async () => {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+
+      const wrapper = mount(KeyboardToolbar, { global: { plugins: [pinia] } })
+      await wrapper.vm.$nextTick()
+
+      const browse = wrapper.find('[data-testid="import-from-preset-browse"]')
+      expect(browse.exists()).toBe(true)
+      expect(wrapper.findComponent(PresetImportModal).props('isVisible')).toBe(false)
+
+      await browse.trigger('click')
+
+      expect(wrapper.findComponent(PresetImportModal).props('isVisible')).toBe(true)
+      // It is a way into the library, not a preset itself: counting it as one would
+      // break every selector that addresses the shortlist.
+      expect(presetItems(wrapper).length).toBe(2)
+    })
+
+    it('should keep presets outside the curated list out of the dropdown', async () => {
+      const wrapper = mount(KeyboardToolbar, { global: { plugins: [createPinia()] } })
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.import-menu').text()).not.toContain('Not Promoted')
     })
 
     it('should load preset when selected', async () => {
@@ -92,7 +126,7 @@ describe('KeyboardToolbar', () => {
       await wrapper.vm.$nextTick()
 
       // Should have fetched the file named in presets.json and loaded the result
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('planck.json'))
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('ansi-104.json'))
       expect(loadKLELayoutSpy).toHaveBeenCalledWith(mockPresetData)
     })
 
@@ -116,10 +150,10 @@ describe('KeyboardToolbar', () => {
       await new Promise((resolve) => setTimeout(resolve, 500))
       await wrapper.vm.$nextTick()
 
-      expect(componentStore.filename).toBe('planck')
+      expect(componentStore.filename).toBe('ansi-104')
     })
 
-    it('should load available presets from presets.json', async () => {
+    it('should list the curated presets from presets.json in promotion order', async () => {
       const wrapper = mount(KeyboardToolbar, {
         global: {
           plugins: [createPinia()],

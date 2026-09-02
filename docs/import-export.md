@@ -217,6 +217,10 @@ keyboards that define more than one layout, arrows under the preview step throug
 Cycling variants is preview-only; importing always loads the complete layout, and you pick the
 variant you want afterwards from the layout toolbar below the canvas.
 
+The [preset library](#presets) uses the same renderer, but draws every card as it scrolls into
+view rather than on hover — the preset payloads ship with kle-ng, so there is no download to
+wait for or abandon.
+
 Because the preview has already downloaded the definition, pressing **Import** on a keyboard you
 previewed does not re-request it. Nothing is downloaded until you hover — opening the modal on its
 own only fetches the keyboard index.
@@ -291,6 +295,16 @@ Click the **Import** button in the toolbar and select:
 **From QMK** — Search and import any keyboard directly from the [QMK keyboard database](https://keyboards.qmk.fm/). A searchable list of all available keyboards is loaded from `keyboards.qmk.fm`. Type to filter with fuzzy search, select a keyboard, and click **Import** (or double-click an entry). The keyboard's `info.json` is fetched and converted to KLE format automatically — no file download required. This is equivalent to downloading a keyboard's `info.json` and using **From File**, but without the manual steps.
 
 **From VIA** — Search and import any keyboard directly from a curated index of VIA-ready keyboards. A searchable list is loaded from [`https://adamws.github.io/keyboard-pcbs/keyboard_list.json`](https://adamws.github.io/keyboard-pcbs/keyboard_list.json). Type to filter with fuzzy search, select a keyboard, and click **Import** (or double-click an entry). The keyboard's VIA layout JSON is fetched from the [`the-via/keyboards` GitHub repository](https://github.com/the-via/keyboards) (`v3/` directory), converted to KLE format automatically, and VIA metadata is preserved. This is equivalent to downloading a VIA layout JSON and using **From File**, but without the manual steps.
+
+**From Preset** — Browse the layouts that ship with kle-ng as a grid of cards, each showing a live preview of the board. Click a card to load it. The Import menu also lists a few presets directly, under **Top Presets**, as a shortcut; **From Preset** opens the whole library. See [Starting from a preset](#presets).
+
+### Starting from a preset {#presets}
+
+kle-ng ships a library of ready-made layouts — full-size ANSI and ISO, 60% variants, ortholinear boards, split and ergonomic boards, and a blank canvas.
+
+The **Import** menu lists the most commonly used ones under **Top Presets**, so the layouts most people start from are one click away. **Import → From Preset** opens the complete library in a grid. Each card draws the actual layout with the same renderer as the editor canvas, so you can tell boards apart at a glance; previews load as cards scroll into view. Type in the search box to filter by name or by keyword — `ortho`, `split`, `60%`, `empty` — and click a card to load it.
+
+Loading a preset replaces the current layout, clears the undo history, and establishes a new clean baseline, so the unsaved-changes indicator resets. Save your work first if you still need it. The preset's name becomes the default download filename.
 
 ### Drag and Drop
 
